@@ -1,0 +1,161 @@
+================================= Locust Load Testing Setup and Configuration============================
+
+1) Install python on windows
+ - Used the below command to locate python,.exe and add it into path variable
+python -c "import os, sys; print(os.path.dirname(sys.executable))"
+2) Install Locust on windows - Steps given on locust website and once installed locust then locate locust.exe 
+   Add it into path variable.
+EX: c:\users\yugansethu\appdata\local\packages\pythonsoftwarefoundation.python.3.12_qbz5n2kfra8p0\localcache\local-packages\python312\Scripts
+
+3) Create Maven Project and copy below dependencies into pom.xml
+
+=============pom.xml=========
+  <dependencies>
+        <dependency>
+            <groupId>com.github.myzhan</groupId>
+            <artifactId>locust4j</artifactId>
+            <version>2.2.3</version>
+        </dependency>
+		       <dependency>
+		  <groupId>io.rest-assured</groupId>
+		  <artifactId>rest-assured</artifactId>
+		  <version>5.3.2</version>
+		</dependency>
+        <dependency>
+    <groupId>org.slf4j</groupId>
+    <artifactId>slf4j-api</artifactId>
+    <version>2.0.13</version>
+</dependency>
+
+<dependency>
+    <groupId>javax.xml.bind</groupId>
+    <artifactId>jaxb-api</artifactId>
+    <version>2.3.1</version>
+</dependency>
+
+<dependency>
+    <groupId>org.slf4j</groupId>
+    <artifactId>slf4j-simple</artifactId>
+    <version>2.0.13</version>
+</dependency>
+    </dependencies>
+    
+    <build>
+        <plugins>
+            <plugin>
+                <artifactId>maven-assembly-plugin</artifactId>
+                <configuration>
+                    <archive>
+                        <manifest>
+                            <addClasspath>true</addClasspath>
+                            <mainClass>loadtest.Kloud4LocustMain</mainClass>
+                        </manifest>
+                    </archive>
+                    <descriptorRefs>
+                        <descriptorRef>jar-with-dependencies</descriptorRef>
+                    </descriptorRefs>
+                </configuration>
+                 <executions>
+        <execution>
+          <id>make-assembly</id> <!-- this is used for inheritance merges -->
+          <phase>package</phase> <!-- bind to the packaging phase -->
+          <goals>
+            <goal>single</goal>
+          </goals>
+        </execution>
+      </executions>
+            </plugin>
+        </plugins>
+    </build>
+	
+4) Create Locust loadtesting class	
+	
+======================= OpenApplicationTask.java ====================
+import static io.restassured.RestAssured.*;
+import com.github.myzhan.locust4j.AbstractTask;
+import com.github.myzhan.locust4j.Locust;
+
+import io.restassured.matcher.RestAssuredMatchers;
+import io.restassured.response.Response;
+import io.restassured.response.ValidatableResponse;
+
+public class OpenApplicationTask extends AbstractTask {
+
+	private int weight;
+
+    @Override
+    public int getWeight() {
+        return weight;
+    }
+
+
+    @Override
+    public String getName() {
+        return "Open application task";
+    }
+
+    public OpenApplicationTask(int weight){
+        this.weight = weight;
+    }
+
+    @Override
+    public void execute() {
+        try {
+        	ValidatableResponse response = given().param("store","0123").when().
+            get("http://localhost:8080/home").then().statusCode(200);
+        //	get("http://localhost:8081/nt-ms/fetchProductsUsingCategory/Featured").
+            Locust.getInstance().recordSuccess("http", getName(), response.using().extract().time(), 1);
+        } catch (Exception ex) {
+            ex.printStackTrace();
+        }
+    }
+5) Create locust loadtest testcase main class
+
+	========================= Kloud4LocustMain.java=========================================
+	import com.github.myzhan.locust4j.Locust;
+
+public class Kloud4LocustMain {
+
+	public static void main(String[] args) {
+        Locust locust = Locust.getInstance();
+        locust.setMasterHost("127.0.0.1"); 
+        locust.setMasterPort(5557); //some free port to run the Locust slave
+        
+        
+      
+        
+        locust.run(new OpenApplicationTask(50));
+       // locust.run(null); // <- You custom performance tasks should be here
+    }
+}
+
+6) Create python dummy script as per below
+	
+	==============locust-master.py===================
+	
+from locust import User, TaskSet, task, between
+
+class MyTaskSet(TaskSet):
+    @task
+    def my_task(self):
+        print("executing my_task")
+
+class MyUser(User):
+    tasks = [MyTaskSet]
+    wait_time = between(5, 15)
+
+7)
+==================== Test Types==============
+ - Page Loading test
+ - API Load Testing
+ 
+8) Run master node as per below
+locust -f C:\Users\yugansethu\udemy\locustdemo\src\main\java\loadtesingdemo\locustdemo\python\locust-master.py --master --master-bind-host=127.0.0.1  --master-bind-port=5557
+
+9) Run slave or worker node as per below
+java -cp locustdemo-0.0.1-SNAPSHOT-jar-with-dependencies.jar loadtesingdemo.locustdemo.Kloud4LocustMain 
+
+10) Finally click the below link to run testcases
+
+http://localhost:8089
+
